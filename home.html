@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - ART QUIZ</title>
+    <style>
+        body { background: #050505; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding-bottom: 60px; }
+        .header { padding: 20px; background: #111; border-bottom: 2px solid #D4AF37; display: flex; justify-content: space-between; align-items: center; }
+        .logo { color: #D4AF37; font-size: 1.5rem; font-weight: bold; }
+        .notification-bar { background: linear-gradient(90deg, #111, #332200, #111); color: #fff; padding: 10px; white-space: nowrap; overflow: hidden; position: relative; border-bottom: 1px solid #333; }
+        .marquee { display: inline-block; padding-left: 100%; animation: marquee 15s linear infinite; color: #FFD700; }
+        @keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+        
+        .hero { text-align: center; margin-top: 50px; padding: 20px; }
+        .start-btn { 
+            background: transparent; border: 2px solid #D4AF37; color: #D4AF37; 
+            padding: 20px 50px; font-size: 1.5rem; border-radius: 50px; cursor: pointer;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.3); transition: 0.4s;
+            position: relative; overflow: hidden;
+        }
+        .start-btn:hover { background: #D4AF37; color: #000; box-shadow: 0 0 40px rgba(212, 175, 55, 0.8); }
+        
+        .info-card { background: #1a1a1a; margin: 20px; padding: 20px; border-radius: 10px; border-left: 4px solid #D4AF37; }
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #111; display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid #333; }
+        .nav-item { color: #888; text-decoration: none; font-size: 0.9rem; }
+        .nav-item.active { color: #D4AF37; }
+        #timerDisplay { font-size: 1.2rem; color: #aaa; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="notification-bar">
+        <div class="marquee" id="marqueeText">Loading Leaderboard Winners... Season 1 Winners announced! </div>
+    </div>
+
+    <div class="header">
+        <div class="logo">ART QUIZ</div>
+        <div id="uName">User</div>
+    </div>
+
+    <div class="hero">
+        <button class="start-btn" onclick="checkGameStatus()">START GAME</button>
+        <div id="timerDisplay">Checking Season Status...</div>
+    </div>
+
+    <div class="info-card">
+        <h3>Current Season</h3>
+        <p id="seasonName">Loading...</p>
+        <p>Total Prize: <span style="color:#D4AF37">High Value</span></p>
+    </div>
+
+    <div class="bottom-nav">
+        <a href="#" class="nav-item active">Home</a>
+        <a href="leaderboard.html" class="nav-item">Leaderboard</a>
+        <a href="login_register.html" class="nav-item">Logout</a>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyDKO9G5GLdHk5D_UCzDx-A76yb80zvesJ4", authDomain: "quiz-55a8d.firebaseapp.com", databaseURL: "https://quiz-55a8d-default-rtdb.firebaseio.com", projectId: "quiz-55a8d", storageBucket: "quiz-55a8d.firebasestorage.app", messagingSenderId: "745030366382", appId: "1:745030366382:web:25d6210f97391136d5693f" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const user = JSON.parse(localStorage.getItem('artUser'));
+        if(user) document.getElementById('uName').innerText = user.fname;
+
+        // Fetch Global Settings
+        get(ref(db, 'game_settings')).then(snapshot => {
+            if(snapshot.exists()){
+                const settings = snapshot.val();
+                document.getElementById('seasonName').innerText = settings.seasonName || "Season 1";
+                document.getElementById('marqueeText').innerText = `🏆 Top Winner: ${settings.topWinner || 'Nobody yet'} - Win ${settings.prize || '$1000'}!`;
+                
+                window.gameStartTime = settings.startTime; // "20:00" format
+                window.gameDate = settings.startDate; // "YYYY-MM-DD"
+                
+                updateTimer();
+            }
+        });
+
+        function updateTimer() {
+            // Simple display logic (Production needs detailed Date object comparison)
+            document.getElementById('timerDisplay').innerText = `Next Game: ${window.gameStartTime || 'TBA'}`;
+        }
+
+        window.checkGameStatus = () => {
+            // Check if user is blocked
+            get(ref(db, `users/${user.phone}/status`)).then(snap => {
+                if(snap.val() === 'blocked') {
+                    alert("You are blocked.");
+                    return;
+                }
+                // Time check logic would go here. For demo, we allow entry.
+                window.location.href = 'start.html';
+            });
+        }
+    </script>
+</body>
+</html>
