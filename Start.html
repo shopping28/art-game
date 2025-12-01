@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playing - ART QUIZ</title>
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .game-card { width: 90%; max-width: 500px; text-align: center; }
+        
+        /* Stages */
+        #questionText { font-size: 1.5rem; color: #D4AF37; margin-bottom: 20px; animation: fadeIn 1s; }
+        .hidden { display: none !important; }
+        
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .option-btn { background: #222; border: 1px solid #444; color: white; padding: 20px; font-size: 1.2rem; border-radius: 10px; cursor: pointer; }
+        .option-btn:active { background: #D4AF37; color: black; }
+
+        .timer-bar { width: 100%; height: 5px; background: #333; margin-bottom: 20px; }
+        .timer-fill { height: 100%; background: #D4AF37; width: 100%; transition: width 1s linear; }
+
+        .cooldown-screen { text-align: center; }
+        h1 { color: #D4AF37; }
+    </style>
+</head>
+<body>
+
+    <div class="game-card">
+        <div id="hud">
+            <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+            <div id="statusText">Memorize the question...</div>
+        </div>
+
+        <!-- 1. Question View -->
+        <div id="viewPhase">
+            <h2 id="qText">Loading Question...</h2>
+        </div>
+
+        <!-- 2. Answer Phase -->
+        <div id="answerPhase" class="hidden">
+            <h3>Choose the Answer</h3>
+            <div class="options-grid" id="optionsBox">
+                <!-- Buttons injected by JS -->
+            </div>
+        </div>
+
+        <!-- 3. Cooldown -->
+        <div id="cooldownPhase" class="hidden">
+            <h1>Wait Next Question</h1>
+            <h2 id="cdTimer">05:00</h2>
+            <p>Don't leave the app.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, get, update, push, set } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyDKO9G5GLdHk5D_UCzDx-A76yb80zvesJ4", authDomain: "quiz-55a8d.firebaseapp.com", databaseURL: "https://quiz-55a8d-default-rtdb.firebaseio.com", projectId: "quiz-55a8d", storageBucket: "quiz-55a8d.firebasestorage.app", messagingSenderId: "745030366382", appId: "1:745030366382:web:25d6210f97391136d5693f" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const user = JSON.parse(localStorage.getItem('artUser'));
+
+        if(!user) window.location.href = 'login_register.html';
+
+        let currentQ = null;
+        
+        // Start Cycle
+        loadNextQuestion();
+
+        function loadNextQuestion() {
+            // Check Cooldown in DB (Simplified: Using localstorage for demo speed, DB recommended for security)
+            const lastTime = localStorage.getItem('lastAnswerTime');
+            if(lastTime && (Date.now() - lastTime) < 300000) { // 5 mins
+                showCooldown(300000 - (Date.now() - lastTime));
+                return;
+            }
+
+            // Fetch Random Question from DB
+            get(ref(db, 'questions')).then(snap => {
+                if(!snap.exists()) return alert("No questions set by admin.");
+                const questions = Object.values(snap.val());
+                // Pick random (Logic to filter answered ones should be added here)
+                currentQ = questions[Math.floor(Math.random() * questions.length)];
+                startViewPhase();
+            });
+        }
+
+        function startViewPhase() {
+            document.getElementById('viewPhase').classList.remove('hidden');
+            document.getElementById('answerPhase').classList.add('hidden');
+            document.getElementById('cooldownPhase').classList.add('hidden');
+            
+            document.getElementById('qText').innerText = currentQ.text;
+            
+            // View Timer (e.g., 10 seconds)
+            let viewTime = parseInt(currentQ.viewTime) || 10;
+            document.getElementById('statusText').innerText = `Memorize! Hiding in ${viewTime}s`;
+            
+            setTimeout(() => {
+                startAnswerPhase();
+            }, viewTime * 1000);
+        }
+
+        function startAnswerPhase() {
+            document.getElementById('viewPhase').classList.add('hidden');
+            document.getElementById('answerPhase').classList.remove('hidden');
+            document.getElementById('statusText').innerText = "Select Answer Now!";
+
+            const optsDiv = document.getElementById('optionsBox');
+            optsDiv.innerHTML = "";
+            
+            // Show options
+            currentQ.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerText = opt;
+                btn.onclick = () => submitAnswer(index);
+                optsDiv.appendChild(btn);
+            });
+        }
+
+        window.submitAnswer = (idx) => {
+            const isCorrect = (idx == currentQ.correctIndex);
+            
+            // Update User Stats
+            const updates = {};
+            if(isCorrect) {
+                updates[`users/${user.phone}/score`] = (user.score || 0) + 10;
+                updates[`users/${user.phone}/correct`] = (user.correct || 0) + 1;
+            } else {
+                updates[`users/${user.phone}/wrong`] = (user.wrong || 0) + 1;
+            }
+            
+            // Log Action
+            update(ref(db), updates).then(() => {
+                alert(isCorrect ? "Correct!" : "Wrong!");
+                localStorage.setItem('lastAnswerTime', Date.now());
+                showCooldown(300000); // 5 mins
+            });
+        }
+
+        function showCooldown(ms) {
+            document.getElementById('viewPhase').classList.add('hidden');
+            document.getElementById('answerPhase').classList.add('hidden');
+            document.getElementById('cooldownPhase').classList.remove('hidden');
+            document.getElementById('hud').classList.add('hidden');
+
+            let sec = Math.floor(ms / 1000);
+            const interval = setInterval(() => {
+                sec--;
+                let m = Math.floor(sec / 60);
+                let s = sec % 60;
+                document.getElementById('cdTimer').innerText = `${m}:${s < 10 ? '0'+s : s}`;
+                if(sec <= 0) {
+                    clearInterval(interval);
+                    location.reload(); // Reload to get next question
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
