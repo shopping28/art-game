@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile</title>
+    <style>
+        body { background: #050505; color: #fff; font-family: 'Segoe UI', sans-serif; padding: 0; margin: 0; }
+        
+        .header { padding: 20px; display: flex; align-items: center; background: #111; border-bottom: 1px solid #333; }
+        .back { color: #D4AF37; text-decoration: none; font-size: 1.5rem; margin-right: 15px; }
+        h2 { margin: 0; font-size: 1.2rem; color: #D4AF37; }
+
+        .container { padding: 20px; padding-bottom: 50px; }
+
+        /* Profile Pic Section */
+        .pic-area { text-align: center; margin-bottom: 30px; position: relative; }
+        .avatar { 
+            width: 120px; height: 120px; border-radius: 50%; 
+            border: 3px solid #D4AF37; object-fit: cover; background: #222;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+        }
+        .edit-badge {
+            position: absolute; bottom: 5px; left: 50%; transform: translateX(30px);
+            background: #D4AF37; color: #000; width: 35px; height: 35px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; cursor: pointer; border: 2px solid #000;
+        }
+
+        /* Forms */
+        .label { color: #888; font-size: 0.85rem; margin-top: 15px; margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: 1px; }
+        .input-box { 
+            width: 100%; padding: 15px; background: #1a1a1a; border: 1px solid #333; 
+            color: #fff; border-radius: 8px; font-size: 1rem; box-sizing: border-box; transition: 0.3s;
+        }
+        .input-box:focus { border-color: #D4AF37; outline: none; }
+        
+        .readonly { color: #555; border-color: transparent; background: #0e0e0e; cursor: not-allowed; }
+
+        /* Premium About Section */
+        .about-section { margin-top: 40px; padding: 20px; background: linear-gradient(135deg, #111, #1a1a1a); border-left: 4px solid #D4AF37; border-radius: 5px; }
+        .about-section h3 { margin: 0 0 10px 0; color: #D4AF37; font-size: 1.1rem; text-transform: uppercase; }
+        .about-section p { font-size: 0.95rem; color: #bbb; line-height: 1.6; margin: 0; }
+
+        .save-btn {
+            width: 100%; padding: 18px; background: linear-gradient(45deg, #D4AF37, #B8860B); color: #000;
+            border: none; border-radius: 50px; font-weight: bold; font-size: 1.1rem;
+            margin-top: 30px; cursor: pointer; box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
+        .save-btn:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a href="home.html" class="back">❮</a>
+        <h2>Artist Profile</h2>
+    </div>
+
+    <div class="container">
+        
+        <!-- Image Upload -->
+        <div class="pic-area">
+            <img src="" id="pImg" class="avatar">
+            <div class="edit-badge" onclick="document.getElementById('fIn').click()">📷</div>
+            <input type="file" id="fIn" hidden accept="image/*" onchange="loadFile()">
+        </div>
+
+        <label class="label">Display Name (Editable)</label>
+        <input type="text" id="fname" class="input-box" placeholder="Your Name">
+        
+        <label class="label">Member Since (Auto)</label>
+        <input type="text" id="jDate" class="input-box readonly" readonly>
+
+        <button class="save-btn" onclick="save()">SAVE CHANGES</button>
+
+        <!-- Premium Website Info -->
+        <div class="about-section">
+            <h3>The Art Quiz Legacy</h3>
+            <p>
+                Welcome to the world's most exclusive Art & Knowledge arena. 
+                Our platform connects elite minds through curated challenges and visual masterpieces.
+                <br><br>
+                Every question is a brushstroke, every answer a step towards immortality on the leaderboard.
+                Compete, Conquer, and collect your rewards in real-time.
+                <br><br>
+                <strong>Status:</strong> Premium Member<br>
+                <strong>Security:</strong> Encrypted & Verified
+            </p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, update, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyDKO9G5GLdHk5D_UCzDx-A76yb80zvesJ4", authDomain: "quiz-55a8d.firebaseapp.com", databaseURL: "https://quiz-55a8d-default-rtdb.firebaseio.com", projectId: "quiz-55a8d", storageBucket: "quiz-55a8d.firebasestorage.app", messagingSenderId: "745030366382", appId: "1:745030366382:web:25d6210f97391136d5693f" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        const localUser = JSON.parse(localStorage.getItem('artUser'));
+        if(!localUser) location.href = 'login_register.html';
+
+        const uRef = ref(db, `users/${localUser.phone}`);
+        
+        // Load Profile
+        get(uRef).then(snap => {
+            const u = snap.val();
+            
+            // Set Avatar
+            const def = `https://ui-avatars.com/api/?name=${u.fname}&background=111&color=fff`;
+            document.getElementById('pImg').src = u.profilePic || def;
+
+            // Set Name
+            document.getElementById('fname').value = `${u.fname} ${u.lname}`;
+            
+            // Set Date (Auto)
+            document.getElementById('jDate').value = u.joinDate || "Unknown";
+        });
+
+        // Image Preview
+        let b64 = null;
+        window.loadFile = () => {
+            const f = document.getElementById('fIn').files[0];
+            if(f) {
+                const r = new FileReader();
+                r.onload = (e) => {
+                    document.getElementById('pImg').src = e.target.result;
+                    b64 = e.target.result;
+                }
+                r.readAsDataURL(f);
+            }
+        }
+
+        window.save = () => {
+            const nameArr = document.getElementById('fname').value.split(" ");
+            const uData = {
+                fname: nameArr[0],
+                lname: nameArr.slice(1).join(" ") || ""
+            };
+            if(b64) uData.profilePic = b64;
+
+            update(uRef, uData).then(() => {
+                alert("Profile Updated Successfully!");
+                localUser.fname = uData.fname; 
+                localStorage.setItem('artUser', JSON.stringify(localUser));
+            });
+        }
+    </script>
+</body>
+</html>
