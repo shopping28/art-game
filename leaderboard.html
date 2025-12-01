@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard - ART QUIZ</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px;
+            background: #111;
+            border-bottom: 2px solid #D4AF37;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #D4AF37;
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .back-btn {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #888;
+            text-decoration: none;
+            font-size: 1.2rem;
+            transition: 0.3s;
+        }
+        .back-btn:hover { color: #fff; }
+
+        /* Podium Section (Top 3) */
+        .podium-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            margin-top: 30px;
+            margin-bottom: 30px;
+            height: 220px;
+        }
+
+        .podium-place {
+            text-align: center;
+            margin: 0 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            border: 2px solid #555;
+            font-size: 1.2rem;
+        }
+
+        .bar {
+            width: 80px;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            color: #000;
+            font-weight: bold;
+            padding-bottom: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            animation: rise 1s ease-out;
+        }
+
+        /* Rank 1 */
+        .rank-1 .avatar { border-color: #FFD700; width: 70px; height: 70px; font-size: 1.5rem; background: #FFD700; color: #000; box-shadow: 0 0 20px #FFD700; }
+        .rank-1 .bar { height: 140px; background: linear-gradient(180deg, #FFD700, #B8860B); z-index: 2; }
+        .rank-1 .name { color: #FFD700; font-weight: bold; margin-bottom: 5px; font-size: 1.1rem; }
+
+        /* Rank 2 */
+        .rank-2 .avatar { border-color: #C0C0C0; }
+        .rank-2 .bar { height: 100px; background: linear-gradient(180deg, #C0C0C0, #808080); }
+        .rank-2 .name { color: #C0C0C0; font-size: 0.9rem; margin-bottom: 5px; }
+
+        /* Rank 3 */
+        .rank-3 .avatar { border-color: #CD7F32; }
+        .rank-3 .bar { height: 80px; background: linear-gradient(180deg, #CD7F32, #8B4513); }
+        .rank-3 .name { color: #CD7F32; font-size: 0.9rem; margin-bottom: 5px; }
+
+        @keyframes rise { from { height: 0; } }
+
+        /* List Section (4-10) */
+        .list-container {
+            width: 90%;
+            max-width: 500px;
+            margin: 0 auto;
+            padding-bottom: 20px;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1a1a1a;
+            margin-bottom: 10px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            border-left: 3px solid #333;
+            transition: 0.3s;
+        }
+
+        .list-item:hover {
+            background: #222;
+            border-left-color: #D4AF37;
+            transform: translateX(5px);
+        }
+
+        .item-left { display: flex; align-items: center; gap: 15px; }
+        .rank-num { font-size: 1.1rem; color: #666; width: 25px; }
+        .user-name { font-weight: 500; font-size: 1rem; }
+        .user-score { color: #D4AF37; font-weight: bold; }
+
+        .loading { text-align: center; margin-top: 50px; color: #666; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a href="home.html" class="back-btn">❮</a>
+        <h1>Leaderboard</h1>
+    </div>
+
+    <div id="loading" class="loading">Loading Rankings...</div>
+
+    <!-- Top 3 Visuals -->
+    <div id="podium" class="podium-container" style="display:none;">
+        
+        <!-- Rank 2 -->
+        <div class="podium-place rank-2">
+            <div class="name" id="name2">-</div>
+            <div class="avatar" id="av2">2</div>
+            <div class="bar"><span id="score2">0</span></div>
+        </div>
+
+        <!-- Rank 1 -->
+        <div class="podium-place rank-1">
+            <div class="name" id="name1">-</div>
+            <div class="avatar" id="av1">🏆</div>
+            <div class="bar"><span id="score1">0</span></div>
+        </div>
+
+        <!-- Rank 3 -->
+        <div class="podium-place rank-3">
+            <div class="name" id="name3">-</div>
+            <div class="avatar" id="av3">3</div>
+            <div class="bar"><span id="score3">0</span></div>
+        </div>
+
+    </div>
+
+    <!-- Rest of the List (4-10) -->
+    <div class="list-container" id="listContainer">
+        <!-- JS will inject items here -->
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDKO9G5GLdHk5D_UCzDx-A76yb80zvesJ4",
+            authDomain: "quiz-55a8d.firebaseapp.com",
+            databaseURL: "https://quiz-55a8d-default-rtdb.firebaseio.com",
+            projectId: "quiz-55a8d",
+            storageBucket: "quiz-55a8d.firebasestorage.app",
+            messagingSenderId: "745030366382",
+            appId: "1:745030366382:web:25d6210f97391136d5693f"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const usersRef = ref(db, 'users');
+
+        onValue(usersRef, (snapshot) => {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('podium').style.display = 'flex';
+            
+            const users = [];
+            snapshot.forEach((childSnapshot) => {
+                const user = childSnapshot.val();
+                // Check if user is active (optional: && user.status === 'active')
+                if(user.status === 'active'){
+                    users.push(user);
+                }
+            });
+
+            // 1. Sort by Score (High to Low)
+            users.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+            // 2. Update Podium (Top 3)
+            if(users[0]) updatePodium(1, users[0].fname, users[0].score);
+            if(users[1]) updatePodium(2, users[1].fname, users[1].score);
+            if(users[2]) updatePodium(3, users[2].fname, users[2].score);
+
+            // 3. Update List (4 to 10)
+            const listDiv = document.getElementById('listContainer');
+            listDiv.innerHTML = ""; // Clear old
+
+            for(let i = 3; i < 10; i++) {
+                if(users[i]) {
+                    const u = users[i];
+                    const item = document.createElement('div');
+                    item.className = 'list-item';
+                    item.innerHTML = `
+                        <div class="item-left">
+                            <span class="rank-num">#${i + 1}</span>
+                            <span class="user-name">${u.fname} ${u.lname}</span>
+                        </div>
+                        <span class="user-score">${u.score || 0} pts</span>
+                    `;
+                    listDiv.appendChild(item);
+                }
+            }
+        });
+
+        function updatePodium(rank, name, score) {
+            document.getElementById(`name${rank}`).innerText = name;
+            document.getElementById(`score${rank}`).innerText = score || 0;
+            if(rank !== 1) document.getElementById(`av${rank}`).innerText = name.charAt(0);
+        }
+
+    </script>
+</body>
+</html>
