@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login / Register - ART QUIZ</title>
+    <style>
+        body { background: #0a0a0a; color: #e0e0e0; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: #141414; padding: 40px; border: 1px solid #D4AF37; box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); width: 100%; max-width: 400px; border-radius: 10px; }
+        h2 { text-align: center; color: #D4AF37; margin-bottom: 30px; letter-spacing: 2px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; box-sizing: border-box; border-radius: 5px; outline: none; transition: 0.3s; }
+        input:focus { border-color: #D4AF37; }
+        button { width: 100%; padding: 12px; background: linear-gradient(45deg, #D4AF37, #B8860B); border: none; color: #000; font-weight: bold; cursor: pointer; margin-top: 10px; border-radius: 5px; transition: 0.3s; }
+        button:hover { transform: scale(1.02); box-shadow: 0 0 15px #D4AF37; }
+        .toggle { text-align: center; margin-top: 20px; font-size: 0.9em; cursor: pointer; color: #888; }
+        .toggle span { color: #D4AF37; text-decoration: underline; }
+        .hidden { display: none; }
+        #message { text-align: center; margin-top: 15px; font-size: 0.9rem; min-height: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 id="title">LOGIN</h2>
+    
+    <!-- Login Form -->
+    <div id="loginForm">
+        <input type="number" id="loginPhone" placeholder="Mobile Number">
+        <input type="password" id="loginPass" placeholder="Password">
+        <button onclick="handleLogin()">ENTER GALLERY</button>
+        <div class="toggle" onclick="toggleForm()">New Artist? <span>Register Request</span></div>
+    </div>
+
+    <!-- Register Form -->
+    <div id="registerForm" class="hidden">
+        <input type="text" id="fname" placeholder="First Name">
+        <input type="text" id="lname" placeholder="Last Name">
+        <input type="text" id="shopId" placeholder="Shopping ID">
+        <input type="text" id="userId" placeholder="User ID (Unique)">
+        <input type="number" id="regPhone" placeholder="Mobile Number">
+        <input type="password" id="regPass" placeholder="Password">
+        <button onclick="handleRegister()">SEND REQUEST</button>
+        <div class="toggle" onclick="toggleForm()">Has Account? <span>Login</span></div>
+    </div>
+    <div id="message"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDKO9G5GLdHk5D_UCzDx-A76yb80zvesJ4",
+        authDomain: "quiz-55a8d.firebaseapp.com",
+        databaseURL: "https://quiz-55a8d-default-rtdb.firebaseio.com",
+        projectId: "quiz-55a8d",
+        storageBucket: "quiz-55a8d.firebasestorage.app",
+        messagingSenderId: "745030366382",
+        appId: "1:745030366382:web:25d6210f97391136d5693f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    window.toggleForm = () => {
+        document.getElementById('loginForm').classList.toggle('hidden');
+        document.getElementById('registerForm').classList.toggle('hidden');
+        document.getElementById('title').innerText = document.getElementById('loginForm').classList.contains('hidden') ? 'REGISTRATION' : 'LOGIN';
+    }
+
+    window.handleRegister = () => {
+        const data = {
+            fname: document.getElementById('fname').value,
+            lname: document.getElementById('lname').value,
+            shopId: document.getElementById('shopId').value,
+            userId: document.getElementById('userId').value,
+            phone: document.getElementById('regPhone').value,
+            pass: document.getElementById('regPass').value,
+            status: 'pending', // Waiting for admin
+            score: 0,
+            correct: 0,
+            wrong: 0
+        };
+
+        if(!data.phone || !data.pass) return alert("Fill all fields");
+
+        set(ref(db, 'users/' + data.phone), data)
+        .then(() => {
+            document.getElementById('message').innerText = "Request Sent! Waiting for Admin Approval.";
+            document.getElementById('message').style.color = "#D4AF37";
+            setTimeout(toggleForm, 2000);
+        })
+        .catch((e) => alert("Error: " + e.message));
+    }
+
+    window.handleLogin = () => {
+        const phone = document.getElementById('loginPhone').value;
+        const pass = document.getElementById('loginPass').value;
+        const msg = document.getElementById('message');
+
+        get(child(ref(db), `users/${phone}`)).then((snapshot) => {
+            if (snapshot.exists()) {
+                const user = snapshot.val();
+                if(user.pass === pass) {
+                    if(user.status === 'active') {
+                        localStorage.setItem('artUser', JSON.stringify(user));
+                        window.location.href = 'home.html';
+                    } else if (user.status === 'blocked') {
+                        msg.innerText = "Account Blocked.";
+                        msg.style.color = "red";
+                    } else {
+                        msg.innerText = "Account Pending Approval.";
+                        msg.style.color = "orange";
+                    }
+                } else {
+                    msg.innerText = "Wrong Password.";
+                    msg.style.color = "red";
+                }
+            } else {
+                msg.innerText = "User not found.";
+                msg.style.color = "red";
+            }
+        });
+    }
+</script>
+</body>
+</html>
