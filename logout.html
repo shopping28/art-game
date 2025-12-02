@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signing Out...</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505; /* Deep Black */
+            color: #D4AF37; /* Gold */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Spinner Animation */
+        .loader-ring {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #222;
+            border-top: 4px solid #D4AF37;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 25px;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.1);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            animation: fadeIn 1s ease-in-out;
+            margin: 0;
+        }
+
+        p {
+            color: #666;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            animation: fadeIn 1.5s ease-in-out;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="loader-ring"></div>
+    <h2>Signing Out</h2>
+    <p>See you next time, Artist.</p>
+
+    <script>
+        // 1. Clear the specific user session data
+        localStorage.removeItem('artUser');
+        
+        // 2. Clear any temporary game data (optional, keeps the device clean)
+        localStorage.removeItem('lastQ'); 
+
+        // 3. Redirect to Login/Register page after 2 seconds
+        setTimeout(() => {
+            window.location.href = 'login_register.html';
+        }, 2000);
+    </script>
+
+</body>
+</html>
