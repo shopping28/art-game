@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game Arena</title>
     <style>
-        body { background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        body { background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; margin: 0; }
         .container { width: 90%; max-width: 500px; text-align: center; position: relative; }
         .hidden { display: none !important; }
 
@@ -19,7 +19,7 @@
         .q-header { display: flex; justify-content: space-between; margin-bottom: 10px; color: #888; font-size: 0.8rem; }
         #gameLayer h2 { color: #D4AF37; font-size: 1.3rem; margin-bottom: 20px; text-align: left; border-left: 3px solid #D4AF37; padding-left: 15px; min-height: 60px; }
         
-        .option-btn { width: 100%; padding: 15px; margin: 5px 0; background: #111; border: 1px solid #333; color: white; border-radius: 8px; cursor: pointer; text-align: left; }
+        .option-btn { width: 100%; padding: 15px; margin: 5px 0; background: #111; border: 1px solid #333; color: white; border-radius: 8px; cursor: pointer; text-align: left; transition: 0.2s; }
         .option-btn:active { background: #D4AF37; color: #000; }
 
         /* TIMERS */
@@ -31,31 +31,35 @@
 
         /* WAITING & RESULTS */
         .wait-timer { font-size: 3rem; color: #D4AF37; font-weight: bold; }
-        .season-end { color: #ff3333; font-size: 2rem; font-weight: bold; margin-bottom: 10px; }
+        .season-end { color: #ff3333; font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
+        .no-season { color: #666; font-size: 1.2rem; margin-top: 20px; }
     </style>
 </head>
 <body>
 
     <div class="container">
         
-        <!-- 1. SCHEDULE / END SCREEN -->
+        <!-- 1. SCHEDULE / END / NO SEASON SCREEN -->
         <div id="scheduleLayer">
-            <div class="schedule-title" id="schedTitle">Season Status</div>
+            <div class="schedule-title" id="schedTitle">Checking Status...</div>
+            
+            <!-- Timer Grid -->
             <div class="timer-grid" id="timerGrid">
-                <div class="time-unit"><span class="time-val" id="dDay">00</span></div>
-                <div class="time-unit"><span class="time-val" id="dHour">00</span></div>
-                <div class="time-unit"><span class="time-val" id="dMin">00</span></div>
-                <div class="time-unit"><span class="time-val" id="dSec">00</span></div>
+                <div class="time-unit"><span class="time-val" id="dDay">00</span><small>D</small></div>
+                <div class="time-unit"><span class="time-val" id="dHour">00</span><small>H</small></div>
+                <div class="time-unit"><span class="time-val" id="dMin">00</span><small>M</small></div>
+                <div class="time-unit"><span class="time-val" id="dSec">00</span><small>S</small></div>
             </div>
-            <p id="schedMsg" style="color:#666; margin-top:20px;">Checking Time...</p>
-            <a href="leaderboard.html" id="lbBtn" class="hidden option-btn" style="text-align:center; margin-top:20px;">View Final Results</a>
+
+            <p id="schedMsg" style="color:#666; margin-top:20px;">Connecting to server...</p>
+            <a href="leaderboard.html" id="lbBtn" class="hidden option-btn" style="text-align:center; margin-top:20px;">View Leaderboard</a>
         </div>
 
         <!-- 2. WAITING COOLDOWN -->
         <div id="waitingLayer" class="hidden">
             <h3 style="color:#D4AF37">NEXT QUESTION IN</h3>
             <div class="wait-timer" id="waitCount">00:00</div>
-            <p>Don't close the app.</p>
+            <p>Please wait...</p>
         </div>
 
         <!-- 3. GAME LAYER -->
@@ -79,7 +83,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { getDatabase, ref, get, update, onValue } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
         const firebaseConfig = { apiKey: "AIzaSyDKO9G5GLdHk5D_UCzDx-A76yb80zvesJ4", authDomain: "quiz-55a8d.firebaseapp.com", databaseURL: "https://quiz-55a8d-default-rtdb.firebaseio.com", projectId: "quiz-55a8d", storageBucket: "quiz-55a8d.firebasestorage.app", messagingSenderId: "745030366382", appId: "1:745030366382:web:25d6210f97391136d5693f" };
         const app = initializeApp(firebaseConfig);
@@ -89,48 +93,92 @@
         if(!user) location.href = 'login_register.html';
 
         let ansTimerInterval;
+        let mainTimerInterval; // To control the countdown clock
+        let isGameActive = false;
 
-        // --- 1. CHECK TIME & SEASON STATUS ---
-        get(ref(db, 'game_settings')).then(snap => {
-            if(snap.exists()) {
-                const s = snap.val();
+        // --- 1. REAL-TIME SEASON LISTENER ---
+        // This is the key change: onValue ensures instant updates
+        onValue(ref(db, 'game_settings'), (snap) => {
+            const s = snap.val();
+            
+            // Clear any running timers immediately if things change
+            clearInterval(mainTimerInterval);
+            
+            if(!s) {
+                // NO SEASON ACTIVE (Admin deleted it)
+                handleNoSeason();
+            } else {
+                // SEASON EXISTS (New or Old)
                 window.maxLimit = s.maxQuestions || 10;
-                
                 const start = new Date(`${s.startDate}T${s.startTime}:00`).getTime();
                 const end = new Date(`${s.endDate}T${s.endTime}:00`).getTime();
                 
-                timeManager(start, end);
+                // Start the countdown logic
+                startTimerLogic(start, end);
             }
         });
 
-        function timeManager(start, end) {
-            const timer = setInterval(() => {
+        function handleNoSeason() {
+            isGameActive = false;
+            document.getElementById('scheduleLayer').classList.remove('hidden');
+            document.getElementById('gameLayer').classList.add('hidden');
+            document.getElementById('waitingLayer').classList.add('hidden');
+            document.getElementById('timerGrid').classList.add('hidden');
+            
+            document.getElementById('schedTitle').innerText = "NO LIVE SEASON";
+            document.getElementById('schedMsg').innerHTML = "<span class='no-season'>Please wait for the next season...</span>";
+            document.getElementById('lbBtn').classList.remove('hidden');
+        }
+
+        function startTimerLogic(start, end) {
+            document.getElementById('timerGrid').classList.remove('hidden');
+            document.getElementById('lbBtn').classList.add('hidden');
+
+            function tick() {
                 const now = Date.now();
-                
+
                 if (now < start) {
-                    // Season Not Started
-                    updateTimerDisplay(start - now);
+                    // BEFORE START
+                    isGameActive = false;
+                    document.getElementById('scheduleLayer').classList.remove('hidden');
+                    document.getElementById('gameLayer').classList.add('hidden');
+                    
                     document.getElementById('schedTitle').innerText = "SEASON STARTS IN";
+                    document.getElementById('schedMsg').innerText = "Get ready!";
+                    updateTimerDisplay(start - now);
                 } 
                 else if (now >= start && now < end) {
-                    // SEASON ACTIVE
-                    clearInterval(timer);
-                    document.getElementById('scheduleLayer').classList.add('hidden');
-                    checkUserCooldown();
+                    // LIVE NOW
+                    if(!isGameActive) {
+                        isGameActive = true;
+                        document.getElementById('scheduleLayer').classList.add('hidden');
+                        checkUserCooldown(); // Start the game flow
+                    }
                 } 
                 else {
-                    // SEASON ENDED
-                    clearInterval(timer);
+                    // ENDED
+                    isGameActive = false;
+                    document.getElementById('scheduleLayer').classList.remove('hidden');
+                    document.getElementById('gameLayer').classList.add('hidden');
+                    document.getElementById('waitingLayer').classList.add('hidden');
+                    document.getElementById('timerGrid').classList.add('hidden');
+
                     document.getElementById('schedTitle').innerText = "SEASON ENDED";
                     document.getElementById('schedMsg').innerHTML = "<span class='season-end'>CALCULATING RESULTS...</span>";
-                    document.getElementById('timerGrid').classList.add('hidden');
                     document.getElementById('lbBtn').classList.remove('hidden');
+                    clearInterval(mainTimerInterval);
                 }
-            }, 1000);
+            }
+            
+            // Run immediately then interval
+            tick();
+            mainTimerInterval = setInterval(tick, 1000);
         }
 
         // --- 2. COOLDOWN CHECK ---
         function checkUserCooldown() {
+            if(!isGameActive) return; // Safety check
+
             get(ref(db, `users/${user.phone}/nextAvailableTime`)).then(snap => {
                 const nextTime = snap.val() || 0;
                 if (Date.now() < nextTime) {
@@ -143,9 +191,17 @@
 
         function showWaitScreen(target) {
             document.getElementById('waitingLayer').classList.remove('hidden');
+            document.getElementById('gameLayer').classList.add('hidden');
+            
             const iv = setInterval(() => {
                 const diff = target - Date.now();
-                if (diff <= 0) { clearInterval(iv); location.reload(); }
+                if(!isGameActive) { clearInterval(iv); return; } // Stop if season deleted
+
+                if (diff <= 0) { 
+                    clearInterval(iv); 
+                    document.getElementById('waitingLayer').classList.add('hidden');
+                    loadGame();
+                }
                 const m = Math.floor((diff % (1000*60*60))/(1000*60));
                 const s = Math.floor((diff % (1000*60))/1000);
                 document.getElementById('waitCount').innerText = `${m}:${s<10?'0'+s:s}`;
@@ -154,12 +210,14 @@
 
         // --- 3. LOAD GAME ---
         function loadGame() {
+            if(!isGameActive) return;
+
             Promise.all([
                 get(ref(db, 'questions')),
                 get(ref(db, `users/${user.phone}/answered_questions`)),
                 get(ref(db, `users/${user.phone}/score`))
             ]).then(([qSnap, aSnap, sSnap]) => {
-                if(!qSnap.exists()) return alert("No questions.");
+                if(!qSnap.exists()) return alert("No questions in database.");
                 
                 const questions = qSnap.val();
                 const answered = aSnap.val() || {};
@@ -170,16 +228,16 @@
 
                 // Check Limit
                 if(answeredCount >= window.maxLimit) {
-                    alert("You have finished your limit for this season!");
-                    location.href = "leaderboard.html";
+                    document.getElementById('waitingLayer').classList.remove('hidden');
+                    document.getElementById('waitCount').innerText = "DONE";
+                    document.getElementById('waitingLayer').innerHTML = "<h3 style='color:#D4AF37'>DAILY LIMIT REACHED</h3><p>See you next season!</p><a href='leaderboard.html' class='option-btn' style='display:block;text-align:center;margin-top:20px'>Leaderboard</a>";
                     return;
                 }
 
                 // Get Available
                 const available = Object.keys(questions).filter(k => !answered[k]);
                 if(available.length === 0) {
-                    alert("No more questions left!");
-                    location.href = "home.html";
+                    alert("No more questions available!");
                     return;
                 }
 
@@ -192,55 +250,68 @@
         // --- 4. PLAY UI & LOGIC ---
         function playQuestion(key, q, num) {
             document.getElementById('gameLayer').classList.remove('hidden');
+            document.getElementById('waitingLayer').classList.add('hidden');
+            
             document.getElementById('qIdx').innerText = `Q: ${num}/${window.maxLimit}`;
             document.getElementById('qText').innerText = q.text;
-            document.getElementById('optBox').innerHTML = ""; // Hide options initially
+            document.getElementById('optBox').innerHTML = ""; 
 
             // 4a. VIEW PHASE
             document.getElementById('statusTxt').innerText = `READING TIME...`;
-            document.getElementById('vBar').style.transition = `width ${q.viewTime}s linear`;
-            setTimeout(() => document.getElementById('vBar').style.width = "0%", 100);
+            document.getElementById('vBar').style.display = 'block';
+            document.getElementById('aBar').style.display = 'none';
+            document.getElementById('vBar').style.transition = 'none';
+            document.getElementById('vBar').style.width = '100%';
+            
+            // Force redraw for animation
+            setTimeout(() => {
+                document.getElementById('vBar').style.transition = `width ${q.viewTime}s linear`;
+                document.getElementById('vBar').style.width = "0%";
+            }, 50);
 
             setTimeout(() => {
-                startAnswerPhase(key, q);
+                if(isGameActive) startAnswerPhase(key, q);
             }, q.viewTime * 1000);
         }
 
         function startAnswerPhase(key, q) {
-            // Show Options
             const box = document.getElementById('optBox');
+            box.innerHTML = ""; // Clear if needed
+            
             q.options.forEach((o, i) => {
                 const b = document.createElement('button');
                 b.className = 'option-btn';
                 b.innerText = o;
-                b.onclick = () => submitAnswer(key, i, q); // User Click
+                b.onclick = () => submitAnswer(key, i, q);
                 box.appendChild(b);
             });
 
-            // Switch to Answer Timer (Red Bar)
             document.getElementById('vBar').style.display = 'none';
             document.getElementById('aBar').style.display = 'block';
-            document.getElementById('statusTxt').innerText = "ANSWER QUICKLY!";
+            document.getElementById('statusTxt').innerText = "ANSWER NOW!";
             document.getElementById('statusTxt').style.color = "#ff3333";
 
-            const ansTime = q.ansTime || 10;
-            document.getElementById('aBar').style.transition = `width ${ansTime}s linear`;
-            setTimeout(() => document.getElementById('aBar').style.width = "0%", 100);
+            document.getElementById('aBar').style.transition = 'none';
+            document.getElementById('aBar').style.width = '100%';
+            
+            setTimeout(() => {
+                document.getElementById('aBar').style.transition = `width ${q.ansTime || 10}s linear`;
+                document.getElementById('aBar').style.width = "0%";
+            }, 50);
 
-            // TIMER LOGIC: If time runs out, mark as LOSS
             ansTimerInterval = setTimeout(() => {
-                submitAnswer(key, -1, q); // -1 means Time Up / Missed
-            }, ansTime * 1000);
+                submitAnswer(key, -1, q);
+            }, (q.ansTime || 10) * 1000);
         }
 
         function submitAnswer(key, idx, q) {
-            clearTimeout(ansTimerInterval); // Stop timer logic if clicked
+            clearTimeout(ansTimerInterval);
 
             let isCorrect = false;
             let msg = "";
 
             if (idx === -1) {
-                msg = "Time's Up! Question Lost.";
+                msg = "Time's Up! 0 Points.";
             } else if (idx === q.correctIndex) {
                 isCorrect = true;
                 msg = "Correct! +10 Points";
@@ -249,7 +320,6 @@
             }
             alert(msg);
 
-            // DB Updates
             const delay = q.nextDelayMinutes || 2;
             const nextT = Date.now() + (delay * 60 * 1000);
             
@@ -258,10 +328,14 @@
             updates[`users/${user.phone}/nextAvailableTime`] = nextT;
             
             if (isCorrect) {
-                updates[`users/${user.phone}/score`] = (parseInt(document.getElementById('uPts').innerText)||0) + 10;
+                const currentScore = parseInt(document.getElementById('uPts').innerText) || 0;
+                updates[`users/${user.phone}/score`] = currentScore + 10;
             }
 
-            update(ref(db), updates).then(() => location.reload());
+            update(ref(db), updates).then(() => {
+                document.getElementById('gameLayer').classList.add('hidden');
+                checkUserCooldown(); // Go back to waiting loop
+            });
         }
 
         function updateTimerDisplay(ms) {
